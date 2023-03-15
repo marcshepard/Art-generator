@@ -78,6 +78,18 @@ def create_anonymized_file (df : pd.DataFrame, exclude_columns : str, filename :
         # Write the closing html tags
         f.write ("</body>\n</html>")
 
+def create_aggregated_file (df : pd.DataFrame, input_file : str, output_file : str):
+    df = load_excel (input_file)
+
+    # Remove all columns from the dataframe that are not numberic
+    df = df.select_dtypes (include = ["number"])
+
+    # Aggregate all column values grouped by column "ID"
+    df = df.groupby ("ID").sum ()
+
+    # Save to the output file
+    save_excel (df, output_file)
+
 def launch (filename : str):
     if os.name == "nt":
         os.startfile (filename)
@@ -110,7 +122,18 @@ def main():
         elif command == "s" and len(settings) > 0:
             change_settings(settings)
         elif command == "agg":
-            print ("Aggregate not yet implemented")
+            if "votes_file" not in settings:
+                get_file_path (settings, "votes_file", "Excel file of exec votes for honor society applications exported from Forms")
+            pd = load_excel (settings["votes_file"])
+            if pd is None:
+                print (f"Error loading file {settings['votes_file']}. Please check that the file exists and is a valid Excel file. Type s to configure a new file")
+                continue
+            # Set anonymized_applications_file to the same path as applications_file, but with "anonymized_" appended to the filename, and with a .html extensio
+            settings["aggregated_votes_file"] = os.path.join (os.path.dirname (settings["votes_file"]), "aggregated_" +  os.path.basename (settings["applications_file"]))
+            save_settings (settings)
+            create_aggregated_file (pd, settings["votes_file"], settings["aggregated_votes_file"])
+            print (f"Aggregated file saved to {settings['aggregated_votes_file']}")
+            launch (settings["aggregated_votes_file"])
         elif command == "q":
             break
         else:
@@ -123,3 +146,4 @@ def main():
             print ("For more info, see https://github.com/marcshepard/Anonymizer/blob/master/README.md")
 
 main()
+
