@@ -86,6 +86,12 @@ def create_anonymized_file (df : pd.DataFrame, exclude_columns : str, filename :
         # Write the closing html tags
         f.write ("</body>\n</html>")
 
+def launch (filename : str):
+    if os.name == "nt":
+        os.startfile (filename)
+    elif os.name == "posix":
+        os.system ("open " + filename)
+
 def main():
     # load settings
     settings = load_settings ()
@@ -99,13 +105,16 @@ def main():
                 print (f"Error loading file {settings['applications_file']}. Please check that the file exists and is a valid Excel file. Type s to configure a new file")
                 continue
             if "exclude_columns" not in settings:
-                settings["exclude_columns"] = input ("Enter a comma-separated list of columns to exclude from the anonymized file: ")
+                settings["exclude_columns"] = "Start time,Completion time,Email,Name,Enter Your Full Name (first and last),What grade are you entering?"
+                print ("Creating default exclude_columns list - you can change it in settings")
                 save_settings (settings)
             # Set anonymized_applications_file to the same path as applications_file, but with "anonymized_" appended to the filename, and with a .html extensio
             settings["anonymized_applications_file"] = os.path.join (os.path.dirname (settings["applications_file"]), "anonymized_" + \
                                                                      os.path.basename (settings["applications_file"]).rsplit (".", 1)[0] + ".html")
             save_settings (settings)
             create_anonymized_file (pd, settings["exclude_columns"], settings["anonymized_applications_file"])
+            print (f"Anonymized file saved to {settings['anonymized_applications_file']}")
+            launch (settings["anonymized_applications_file"])
         elif command == "s" and len(settings) > 0:
             change_settings(settings)
         elif command == "agg":
