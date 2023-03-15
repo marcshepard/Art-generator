@@ -119,6 +119,6 @@ def main():
                 print ("\ts\tview or change settings")
             print ("\tagg\taggregate")
             print ("\tq\tquit")
-            print ("For more info, see <TODO - add link to README.md>")
+            print ("For more info, see https://github.com/marcshepard/Anonymizer/blob/master/README.md")
 
 main()
