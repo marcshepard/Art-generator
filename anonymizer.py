@@ -1,12 +1,15 @@
 """
-anonymizer.py - anonymize data exported from Forms for review
+anonymizer.py - anonymize excel data exported from Forms
+And put it in html format for easy viewing
 """
 
 import os
 import json
 import pandas as pd
 
+# Configuration variables
 SETTINGS_FILE = os.path.join (os.path.expanduser("~"), "anonymizer_settings.json")
+DEFAULT_EXCLUDE_COLUMNS = "Start time,Completion time,Email,Name,Enter Your Full Name (first and last),What grade are you entering?"
 
 # save settings dictionary to SETTINGS_FILE
 def save_settings (settings : dict):
@@ -48,19 +51,8 @@ def change_settings (settings : dict):
 def get_file_path (settings : dict, key : str, file_description : str):
     while True:
         path = input (f"Enter the path to the {file_description}: ")
-        print (path)
-        print (os.path.join (os.getcwd(), path))
-        print (os.path.join (os.path.expanduser("~"), path))
         if os.path.exists (path):
             settings[key] = path
-            save_settings (settings)
-            break
-        elif os.path.exists (os.path.join (os.getcwd(), path)):
-            settings[key] = os.path.join (os.getcwd(), path)
-            save_settings (settings)
-            break
-        elif os.path.exists(os.path.join (os.path.expanduser("~"), path)):
-            settings[key] = os.path.join (os.path.expanduser("~"), path)
             save_settings (settings)
             break
         else:
@@ -78,7 +70,7 @@ def create_anonymized_file (df : pd.DataFrame, exclude_columns : str, filename :
             # For each element in the row, output the column header in an h3 tag, and the value in a p tag
             for column in row.index:
                 if column not in exclude_columns:
-                    f.write (f"\t<h3>{column}</h3>\n<p>{row[column]}</p>\n")
+                    f.write (f"\t<h3>{column}</h3>\n\t<p>{row[column]}</p>\n")
 
             # Add a page break between rows
             f.write ("<br><br><hr>\n")
@@ -105,7 +97,7 @@ def main():
                 print (f"Error loading file {settings['applications_file']}. Please check that the file exists and is a valid Excel file. Type s to configure a new file")
                 continue
             if "exclude_columns" not in settings:
-                settings["exclude_columns"] = "Start time,Completion time,Email,Name,Enter Your Full Name (first and last),What grade are you entering?"
+                settings["exclude_columns"] = DEFAULT_EXCLUDE_COLUMNS
                 print ("Creating default exclude_columns list - you can change it in settings")
                 save_settings (settings)
             # Set anonymized_applications_file to the same path as applications_file, but with "anonymized_" appended to the filename, and with a .html extensio
