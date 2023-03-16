@@ -102,6 +102,8 @@ class ReadOnlyScrolledText (scrolledtext.ScrolledText):
     def __init__ (self, win : tk.Tk, w : int, h : int, pad : int = 0):
         super (ReadOnlyScrolledText, self).__init__ (win, wrap = tk.WORD, width = w, height = h, padx = pad, pady = pad)
         self.config (state = tk.DISABLED)
+        self.tag_config("error", foreground="red")
+        self.tag_config("error", background="yellow")
 
     def writeln (self, text):
         self.config (state = tk.NORMAL)
@@ -109,9 +111,16 @@ class ReadOnlyScrolledText (scrolledtext.ScrolledText):
         self.see (tk.END)
         self.config (state = tk.DISABLED)
 
+    # Write error messages in red
+    def write_error (self, text):
+        self.config (state = tk.NORMAL)
+        self.insert (tk.END, "ERROR: " + text + "\n", "error")
+        self.see (tk.END)
+        self.config (state = tk.DISABLED)
+
 class ReadOnlyText (tk.Text):
     def __init__ (self, win : tk.Tk, text : str, pady : int = 0):
-        super (ReadOnlyText, self).__init__ (win, height = 2, pady=pady)
+        super (ReadOnlyText, self).__init__ (win, height = 1, pady=pady)
         self.set_text(text)
 
     def set_text (self, text):
@@ -167,6 +176,9 @@ class Root (tk.Tk):
     
     def println (self, text):
         self.textbox.writeln (text)
+
+    def printerr (self, text):
+        self.textbox.write_error (text)
                               
     def select_file(self):
         file = filedialog.askopenfilename(initialdir = "~", title = "Select a spreadsheet of applications", filetype = (("xlsx files", "*.xlsx"), ("all files", "*.*")))
@@ -180,7 +192,7 @@ class Root (tk.Tk):
     def configure_columns(self):
         pd = load_excel (self.settings[KEY_APPLICATIONS_FILE])
         if pd is None:
-            self.println (f"Error loading file {self.settings[KEY_APPLICATIONS_FILE]}. Please check that the file exists and is a valid Excel file or configure a new file")
+            self.printerr (f"Error loading file {self.settings[KEY_APPLICATIONS_FILE]}. Please check that the file exists and is a valid Excel file or configure a new file")
             return
         # Create a popup dialog to let the user select the columns to exclude
         dialog = tk.Toplevel (self)
@@ -212,7 +224,7 @@ class Root (tk.Tk):
         html_file = Root.get_anonymized_filename (spreadsheet)
         pd = load_excel (spreadsheet)
         if pd is None:
-            self.println (f"Error loading file {spreadsheet}. Please check that the file exists and is a valid Excel file or configure a new file")
+            self.printerr (f"Error loading file {spreadsheet}. Please check that the file exists and is a valid Excel file or configure a new file")
             return
         create_anonymized_file (pd, self.settings[KEY_EXCLUDE_COLUMNS], html_file)
         self.println (f"Anonymized file saved to {html_file}")
@@ -224,7 +236,7 @@ class Root (tk.Tk):
         if os.path.exists (html_file):
             launch (html_file)
         else:
-            self.println (f"File {html_file} does not exist. Please anonymize the spreadsheet first")
+            self.printerr (f"File {html_file} does not exist. Please anonymize the spreadsheet first")
    
     def help(self):
         self.println ("First, select a spreadsheet to anonymize and configuring the columns to exclude during the anonymization process.")
