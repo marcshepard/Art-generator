@@ -197,17 +197,18 @@ class Root (tk.Tk):
         # Create a popup dialog to let the user select the columns to exclude
         dialog = tk.Toplevel (self)
         dialog.title ("Configure columns")
-        dialog.geometry ("400x400")
         dialog.resizable (False, False)
         frame = tk.Frame (dialog, relief=tk.RAISED, borderwidth=1)
         frame.pack (fill=tk.BOTH, expand=True)
-        tk.Label(frame, text="Select the columns to exclude from the anonymized file").pack (pady=10)
+        tk.Label(frame, text="Select the columns to exclude from the anonymized file").pack (padx=10, pady=10)
         listbox = tk.Listbox (frame, selectmode=tk.MULTIPLE)
         listbox.pack (fill=tk.BOTH, expand=True)
         for column in pd.columns:
             listbox.insert (tk.END, column)
         for column in self.settings[KEY_EXCLUDE_COLUMNS].split(","):
-            listbox.selection_set (listbox.get (0, tk.END).index (column))
+            column = column.strip()
+            if column in pd.columns:
+                listbox.selection_set (listbox.get (0, tk.END).index (column))
         tk.Button (frame, text="OK", command=lambda: self.configure_columns_ok (dialog, listbox)).pack (pady=10)
 
     def configure_columns_ok(self, dialog, listbox):
