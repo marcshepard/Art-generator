@@ -7,5 +7,3 @@ A prereq to running this script is:
 * Install the following optional packages from a cmd window (launched after Python has been added to your path):
     pip install pandas          # Dataframes to hold grids of data
     pip install openpyxl        # Allows dataframes to be saved or loaded from Excel format
-
-The current script is a command-line tool. To run it, type "anonymizer.py" from a command prompt.
