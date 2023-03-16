@@ -6,10 +6,15 @@ And put it in html format for easy viewing
 import os
 import json
 import pandas as pd
+import tkinter as tk
+from tkinter import filedialog
+from tkinter import scrolledtext
 
 # Configuration variables
 SETTINGS_FILE = os.path.join (os.path.expanduser("~"), "anonymizer_settings.json")
-DEFAULT_EXCLUDE_COLUMNS = "Start time,Completion time,Email,Name,Enter Your Full Name (first and last),What grade are you entering?"
+DEFAULT_EXCLUDE_COLUMNS = "Start time,Completion time,Email,Name"
+KEY_EXCLUDE_COLUMNS = "exclude_columns"
+KEY_APPLICATIONS_FILE = "applications_file"
 
 # save settings dictionary to SETTINGS_FILE
 def save_settings (settings : dict):
@@ -18,11 +23,19 @@ def save_settings (settings : dict):
 
 # load settings dictionary from SETTINGS_FILE
 def load_settings () -> dict:
+    d = {}
     if os.path.exists (SETTINGS_FILE):
         with open (SETTINGS_FILE, "r") as f:
-            return json.load (f)
-    else:
-        return {}
+            d = json.load (f)
+
+    if KEY_EXCLUDE_COLUMNS not in d:
+        d[KEY_EXCLUDE_COLUMNS] = DEFAULT_EXCLUDE_COLUMNS
+        save_settings (d)
+    if KEY_APPLICATIONS_FILE not in d:
+        d[KEY_APPLICATIONS_FILE] = "<none>"
+        save_settings (d)
+
+    return d
     
 # create a dataframe from an excel file, on None if there is an error
 def load_excel (filename : str) -> pd.DataFrame:
@@ -34,18 +47,6 @@ def load_excel (filename : str) -> pd.DataFrame:
 # save a dataframe to an excel file
 def save_excel (df : pd.DataFrame, filename : str):
     df.to_excel (filename, index = False)
-
-# view all settings and let user change them
-def change_settings (settings : dict):
-    print ("Current settings:")
-    for key, value in settings.items ():
-        print ("\t{}: {}".format (key, value))
-    print ("Enter a new value for a setting, or just press enter to keep the current value.")
-    for key, value in settings.items ():
-        new_value = input ("{} [{}]: ".format (key, value))
-        if new_value != "":
-            settings[key] = new_value
-    save_settings (settings)
 
 # get a valid file path from the user and store in settings
 def get_file_path (settings : dict, key : str, file_description : str):
@@ -96,54 +97,140 @@ def launch (filename : str):
     elif os.name == "posix":
         os.system ("open " + filename)
 
-def main():
-    # load settings
-    settings = load_settings ()
-    while True:
-        command = input ("What do you want to do (type enter for options)? ")
-        if command == "a":
-            if "applications_file" not in settings:
-                get_file_path (settings, "applications_file", "Excel file of honor society applications exported from Forms")
-            pd = load_excel (settings["applications_file"])
-            if pd is None:
-                print (f"Error loading file {settings['applications_file']}. Please check that the file exists and is a valid Excel file. Type s to configure a new file")
-                continue
-            if "exclude_columns" not in settings:
-                settings["exclude_columns"] = DEFAULT_EXCLUDE_COLUMNS
-                print ("Creating default exclude_columns list - you can change it in settings")
-                save_settings (settings)
-            # Set anonymized_applications_file to the same path as applications_file, but with "anonymized_" appended to the filename, and with a .html extensio
-            settings["anonymized_applications_file"] = os.path.join (os.path.dirname (settings["applications_file"]), "anonymized_" + \
-                                                                     os.path.basename (settings["applications_file"]).rsplit (".", 1)[0] + ".html")
-            save_settings (settings)
-            create_anonymized_file (pd, settings["exclude_columns"], settings["anonymized_applications_file"])
-            print (f"Anonymized file saved to {settings['anonymized_applications_file']}")
-            launch (settings["anonymized_applications_file"])
-        elif command == "s" and len(settings) > 0:
-            change_settings(settings)
-        elif command == "agg":
-            if "votes_file" not in settings:
-                get_file_path (settings, "votes_file", "Excel file of exec votes for honor society applications exported from Forms")
-            pd = load_excel (settings["votes_file"])
-            if pd is None:
-                print (f"Error loading file {settings['votes_file']}. Please check that the file exists and is a valid Excel file. Type s to configure a new file")
-                continue
-            # Set anonymized_applications_file to the same path as applications_file, but with "anonymized_" appended to the filename, and with a .html extensio
-            settings["aggregated_votes_file"] = os.path.join (os.path.dirname (settings["votes_file"]), "aggregated_" +  os.path.basename (settings["applications_file"]))
-            save_settings (settings)
-            create_aggregated_file (pd, settings["votes_file"], settings["aggregated_votes_file"])
-            print (f"Aggregated file saved to {settings['aggregated_votes_file']}")
-            launch (settings["aggregated_votes_file"])
-        elif command == "q":
-            break
+# Create a class for read-only text output
+class ReadOnlyScrolledText (scrolledtext.ScrolledText):
+    def __init__ (self, win : tk.Tk, w : int, h : int, pad : int = 0):
+        super (ReadOnlyScrolledText, self).__init__ (win, wrap = tk.WORD, width = w, height = h, padx = pad, pady = pad)
+        self.config (state = tk.DISABLED)
+
+    def writeln (self, text):
+        self.config (state = tk.NORMAL)
+        self.insert (tk.END, text + "\n")
+        self.see (tk.END)
+        self.config (state = tk.DISABLED)
+
+class ReadOnlyText (tk.Text):
+    def __init__ (self, win : tk.Tk, text : str, pady : int = 0):
+        super (ReadOnlyText, self).__init__ (win, height = 2, pady=pady)
+        self.set_text(text)
+
+    def set_text (self, text):
+        self.config (state = tk.NORMAL)
+        self.delete (1.0, tk.END)
+        self.insert (tk.END, text)
+        self.config (state = tk.DISABLED)
+
+# Create the root window class
+class Root (tk.Tk):
+    def __init__ (self):
+        super (Root, self).__init__ ()
+        self.title ("Anonymizer")
+        pad = 10
+        settings = load_settings ()
+        self.settings = settings
+
+        # Create a frame to hold the widgets
+        frame = tk.Frame (self, relief=tk.RAISED, borderwidth=1)
+
+        # Create a text label to let folks know what to do
+        tk.Label(frame, text="Welcome to the Excel anonymizer. What do you want to do?").grid(row=0, column = 0, columnspan=5, sticky="ew")
+
+        # Create buttons for the four primary actions
+        tk.Button(frame, text="Select spreadsheet", command=self.select_file)        .grid(row=1, column=0, pady = pad)
+        tk.Button(frame, text="Configure columns",  command=self.configure_columns)  .grid(row=1, column=1, pady = pad)
+        tk.Button(frame, text="Anonymize",          command=self.anonymize)          .grid(row=1, column=2, pady = pad)
+        tk.Button(frame, text="View HTML file",     command=self.view_output)        .grid(row=1, column=3, pady = pad)
+        tk.Button(frame, text="Help",               command=self.help)               .grid(row=1, column=4, pady = pad)
+
+        # Show current configuration
+        tk.Label(frame, text="Spreadsheet: ", anchor="w").grid(row=2, column=0, pady = pad, sticky="e")
+        self.applications_file_label = ReadOnlyText(frame, settings[KEY_APPLICATIONS_FILE])
+        self.applications_file_label.grid(row=2, column=1, columnspan = 4, pady = pad, sticky="w")
+
+        tk.Label(frame, text="Anonymized file: ", justify=tk.LEFT).grid(row=3, column=0, pady = pad, sticky="e")
+        self.output_file_label = ReadOnlyText(frame, text=Root.get_anonymized_filename(settings[KEY_APPLICATIONS_FILE]))
+        self.output_file_label.grid(row=3, column=1, columnspan = 4, pady = pad, sticky="w")
+
+        tk.Label(frame, text="Exclude columns: ", justify=tk.LEFT).grid(row=4, column=0, pady = pad, sticky="e")
+        self.exclude_columns_label = tk.Label(frame, text=settings[KEY_EXCLUDE_COLUMNS], justify=tk.LEFT)
+        self.exclude_columns_label.grid(row=4, column=1, columnspan = 4, pady = pad, sticky="w")
+
+        # Create a read-only message box to display the file path
+        self.textbox = ReadOnlyScrolledText(frame, 80, 10, pad)
+        self.textbox.grid(row=5, columnspan=5, sticky="ew")
+
+        frame.pack(padx=pad, pady=pad)
+
+    @staticmethod
+    def get_anonymized_filename (filename : str) -> str:
+        return os.path.join (os.path.dirname (filename), "Anonymized " + os.path.basename (filename).rsplit(".", 1)[0] + ".html")
+    
+    def println (self, text):
+        self.textbox.writeln (text)
+                              
+    def select_file(self):
+        file = filedialog.askopenfilename(initialdir = "~", title = "Select a spreadsheet of applications", filetype = (("xlsx files", "*.xlsx"), ("all files", "*.*")))
+        if os.path.exists(file):
+            self.settings[KEY_APPLICATIONS_FILE] = file
+            save_settings(self.settings)
+            self.applications_file_label.set_text (file)
+            self.output_file_label.set_text (Root.get_anonymized_filename(file))
+        return file
+
+    def configure_columns(self):
+        pd = load_excel (self.settings[KEY_APPLICATIONS_FILE])
+        if pd is None:
+            self.println (f"Error loading file {self.settings[KEY_APPLICATIONS_FILE]}. Please check that the file exists and is a valid Excel file or configure a new file")
+            return
+        # Create a popup dialog to let the user select the columns to exclude
+        dialog = tk.Toplevel (self)
+        dialog.title ("Configure columns")
+        dialog.geometry ("400x400")
+        dialog.resizable (False, False)
+        frame = tk.Frame (dialog, relief=tk.RAISED, borderwidth=1)
+        frame.pack (fill=tk.BOTH, expand=True)
+        tk.Label(frame, text="Select the columns to exclude from the anonymized file").pack (pady=10)
+        listbox = tk.Listbox (frame, selectmode=tk.MULTIPLE)
+        listbox.pack (fill=tk.BOTH, expand=True)
+        for column in pd.columns:
+            listbox.insert (tk.END, column)
+        for column in self.settings[KEY_EXCLUDE_COLUMNS].split(","):
+            listbox.selection_set (listbox.get (0, tk.END).index (column))
+        tk.Button (frame, text="OK", command=lambda: self.configure_columns_ok (dialog, listbox)).pack (pady=10)
+
+    def configure_columns_ok(self, dialog, listbox):
+        excludes = []
+        for i in listbox.curselection ():
+            excludes.append (listbox.get (i))
+        self.settings[KEY_EXCLUDE_COLUMNS] = ",".join (excludes)
+        save_settings(self.settings)
+        self.exclude_columns_label.config (text=self.settings[KEY_EXCLUDE_COLUMNS])
+        dialog.destroy ()
+
+    def anonymize(self):
+        spreadsheet = self.settings[KEY_APPLICATIONS_FILE]
+        html_file = Root.get_anonymized_filename (spreadsheet)
+        pd = load_excel (spreadsheet)
+        if pd is None:
+            self.println (f"Error loading file {spreadsheet}. Please check that the file exists and is a valid Excel file or configure a new file")
+            return
+        create_anonymized_file (pd, self.settings[KEY_EXCLUDE_COLUMNS], html_file)
+        self.println (f"Anonymized file saved to {html_file}")
+        self.view_output()
+
+    def view_output(self):
+        spreadsheet = self.settings[KEY_APPLICATIONS_FILE]
+        html_file = Root.get_anonymized_filename (spreadsheet)
+        if os.path.exists (html_file):
+            launch (html_file)
         else:
-            print ("Valid commands are:")
-            print ("\ta\tanonymize")
-            if (len(settings) > 0):
-                print ("\ts\tview or change settings")
-            print ("\tagg\taggregate")
-            print ("\tq\tquit")
-            print ("For more info, see https://github.com/marcshepard/Anonymizer/blob/master/README.md")
+            self.println (f"File {html_file} does not exist. Please anonymize the spreadsheet first")
+   
+    def help(self):
+        self.println ("First, select a spreadsheet to anonymize and configuring the columns to exclude during the anonymization process.")
+        self.println ("After that, you can anonymize the spreadsheet. This process will create an HTML file with a separate page for each row " +
+                      "in the spreadsheet formatted to show the column name and cell value for each cell in that row")
+        self.println ("For more info, see https://github.com/marcshepard/Anonymizer/blob/master/README.md")
 
-main()
-
+window = Root()
+window.mainloop()
