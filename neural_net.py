@@ -180,7 +180,7 @@ class ImageGenerator():
         """Stops the training process"""
         self.training = False
 
-    def generate(self, content_image, style_image, output_image, img_size, epochs) -> str:
+    def generate(self, content_image, style_image, output_image, img_size, epochs, learning_rate) -> str:
         """Runs the neural style transfer algorithm to generate an image of the similar to the content image in the style of the style image"""
         self.training = True
         content, style = get_np_images(content_image, style_image, img_size)
@@ -209,7 +209,7 @@ class ImageGenerator():
         preprocessed_style =  tf.Variable(tf.image.convert_image_dtype(style, tf.float32))
         a_S = vgg_model_outputs(preprocessed_style)
 
-        optimizer = tf.keras.optimizers.Adam(learning_rate=0.01)
+        optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
 
         output = tf.Variable(output)
 
@@ -231,20 +231,28 @@ class ImageGenerator():
                 # Compute the total cost
                 J = total_cost(J_content, J_style, alpha=10, beta=40)
 
-
             grad = tape.gradient(J, generated_image)
 
             optimizer.apply_gradients([(grad, generated_image)])
             generated_image.assign(clip_0_1(generated_image))
 
+            return J
+
         # Show the generated image at some epochs
+        best_cost = float('inf')
+        best_epoch = 0
         for i in range(epochs):
-            _train_step(output)
-            if i % 10 == 0:
-                self.trace(f"Epoch {i} ")
+            cost = _train_step(output)
+            if cost < best_cost:
+                best_cost = cost
+                best_epoch = i
+            if i % 10 == 0 or i == epochs - 1:
+                self.trace(f"Epoch {i}, cost = {cost} ")
             if not self.training:
                 break
 
+        if best_epoch != epochs - 1:
+            self.trace (f"Optimal cost was {best_cost} at epoch {best_epoch}")
         image = tensor_to_image(output)
         image.save(output_image)
         self.training = False

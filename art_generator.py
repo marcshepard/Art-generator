@@ -20,6 +20,7 @@ from neural_net import ImageGenerator
 IMAGE_WIDTH = 400   # The width of the images used for training
 IMAGE_HEIGHT = 400  # The height of the images used for training
 DISPLAY_SCALE = .5  # The scale of the images displayed in the GUI
+LEARNING_RATE = .02 # The learning rate for the neural network
 
 # Global read-only variables
 HOME = os.path.join (os.path.expanduser("~"))
@@ -27,8 +28,12 @@ SETTINGS_FILE = os.path.join (HOME, "art_generator.json")
 KEY_CONTENT_FILE = "content"
 KEY_STYLE_FILE = "style"
 KEY_EPOCHS = "epochs"
+KEY_LAST_DIR = "last_dir"         # Directory to start with for file dialog (starts with HOME, but remember the last one used
 WELCOME_MESSAGE = """Welcome to the Art Generator.
-Select content and style images and then click 'Generate' to create a new image."""
+Select a content image (any photo you like) and style images (paintings work best, try a Van Gogh, Kandinsky, or Munch).
+Then 'Generate' to create a new image that combines the content and style.
+Tune the 'epochs' (iterations) to try to get the lowest 'cost' (how far away the generated image is from what the generator thinks is optimal).
+"""
 DEFAULT_EPOCHS = 200
 
 def save_settings (settings : dict):
@@ -45,15 +50,12 @@ def load_settings () -> dict:
 
     if KEY_EPOCHS not in settings:
         settings[KEY_EPOCHS] = DEFAULT_EPOCHS
-    if KEY_CONTENT_FILE not in settings:
+    if KEY_CONTENT_FILE not in settings or not os.path.exists (settings[KEY_CONTENT_FILE]):
         settings[KEY_CONTENT_FILE] = None
-    if KEY_STYLE_FILE not in settings:
+    if KEY_STYLE_FILE not in settings or not os.path.exists (settings[KEY_STYLE_FILE]):
         settings[KEY_STYLE_FILE] = None
-
-    if not os.path.exists (settings[KEY_CONTENT_FILE]):
-        settings[KEY_CONTENT_FILE] = None
-    if not os.path.exists (settings[KEY_STYLE_FILE]):
-        settings[KEY_STYLE_FILE] = None
+    if KEY_LAST_DIR not in settings or not os.path.exists (settings[KEY_LAST_DIR]):
+        settings[KEY_LAST_DIR] = HOME
 
     return settings
 
@@ -96,7 +98,6 @@ class DisplayImage (tk.Label):
         img = ImageTk.PhotoImage (img)
         self.config (image = img)
         self.image = img
-        #self.update ()
 
 # Create a class to display a label and small numeric input field
 class NumberEntry (tk.Frame):
@@ -208,19 +209,21 @@ class Root (tk.Tk):
 
     def pop_up_image(self, image_file : str):
         """Display the image in a pop-up window"""
-        image = Image.open(image_file)
-        image.show()
+        popup = tk.Toplevel(height=int(IMAGE_HEIGHT * 1.5), width=int(IMAGE_WIDTH * 1.5))
+        popup.title("Generated image")
+        display_image = DisplayImage(popup, IMAGE_WIDTH, IMAGE_HEIGHT)
+        display_image.set_image (image_file)
+        display_image.place(anchor="c", relx=.5, rely=.5)
 
     def generate_async (self):
         """Generate the image in a separate thread"""
         self.generate_button.config (text = "Cancel")
         try:
-            save_settings(self.settings)
             content_img = self.settings[KEY_CONTENT_FILE]
             style_img = self.settings[KEY_STYLE_FILE]
             output_img = content_img.rsplit(".", 1)[0] + " styled as " + os.path.basename(style_img)
-            self.image_generator.generate (content_img, style_img, output_img, IMAGE_WIDTH, self.epochs.get_value ())
-            self.textbox.writeln ("Generated image: " + output_img)
+            self.image_generator.generate (content_img, style_img, output_img, IMAGE_WIDTH, self.epochs.get_value (), LEARNING_RATE)
+            self.textbox.writeln ("Image generation complete: " + output_img + "\n")
             self.pop_up_image (output_img)
         except Exception as exc: # pylint: disable=broad-except
             self.printerr ("Error generating image: " + str(exc))
@@ -233,6 +236,10 @@ class Root (tk.Tk):
         current_button = self.generate_button.cget("text")
         if current_button == "Generate":
             self.generate_button.config (text = "Cancel")
+            if self.settings[KEY_EPOCHS] != self.epochs.get_value ():
+                self.settings[KEY_EPOCHS] = self.epochs.get_value ()
+                save_settings(self.settings)
+            self.textbox.writeln ("Starting image generation. You can cancel at any time to get a partial result.")
             Thread (target = self.generate_async).start ()
         elif current_button == "Cancel":
             self.generate_button.config (state = tk.DISABLED)
@@ -242,9 +249,10 @@ class Root (tk.Tk):
 
     def select_image_file (self, key : str) -> None:
         """Select an image file and return the path"""
-        file = filedialog.askopenfilename(initialdir = "~", title = "Select an image", filetype = [("Image files", "*.jpg *.jpeg")])
+        file = filedialog.askopenfilename(initialdir = self.settings[KEY_LAST_DIR], title = "Select an image", filetype = [("Image files", "*.jpg *.jpeg")])
         if os.path.exists(file):
             self.settings[key] = file
+            self.settings[KEY_LAST_DIR] = os.path.dirname(file)
             save_settings(self.settings)
             if self.settings[KEY_STYLE_FILE] is not None and self.settings[KEY_CONTENT_FILE] is not None:
                 self.generate_button.config (state = tk.NORMAL)
@@ -259,7 +267,7 @@ class Root (tk.Tk):
         """Select a style image file"""
         self.select_image_file (KEY_STYLE_FILE)
         self.style_image_label.set (self.display_text(KEY_STYLE_FILE))
-        self.content_image.set_image (self.settings[KEY_STYLE_FILE])
+        self.style_image.set_image (self.settings[KEY_STYLE_FILE])
 
 window = Root()
 window.mainloop()
