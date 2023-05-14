@@ -17,9 +17,9 @@ from neural_net import ImageGenerator
 # pylint: disable=too-many-ancestors, line-too-long, too-many-arguments, too-many-instance-attributes
 
 # Configuration variables (not yet settable in the GUI)
-IMAGE_WIDTH = 400   # The width of the images used for training
-IMAGE_HEIGHT = 400  # The height of the images used for training
-DISPLAY_SCALE = .5  # The scale of the images displayed in the GUI
+IMAGE_WIDTH = 400   # Images scaled to this size for training and output
+IMAGE_HEIGHT = 400
+DISPLAY_SCALE = .5  # Make them smaller in the GUI
 LEARNING_RATE = .02 # The learning rate for the neural network
 
 # Global read-only variables
@@ -81,7 +81,6 @@ class ReadOnlyScrolledText (scrolledtext.ScrolledText):
         self.see (tk.END)
         self.config (state = tk.DISABLED)
 
-# Create a class to display an image scaled to a given size
 class DisplayImage (tk.Label):
     """A label that displays an image scaled to a given size"""
     def __init__ (self, parent : tk.Tk, w : int = None, h : int = None):
