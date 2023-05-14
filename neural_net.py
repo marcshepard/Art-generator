@@ -1,11 +1,7 @@
-"""art_generator.py - generate art from a content and style image.
+"""neural_net.py - the engine for generating art from a content and style image.
 
 Given a content image and a style image, generate a new image that combines the
 content of the content image with the style of the style image.
-
-To use this file, create a directory called "art_images", place a content and style image there,
-and make sure the variables CONTENT_IMAGE and STYLE_IMAGE point to the correct files.
-Also configure IMG_SIZE and EPOCHS to your liking.
 
 The is based on the art-generation-with-nerural-style-transfer" assignment in
 Andrew Ng's CNN class:
@@ -13,6 +9,7 @@ https://www.coursera.org/learn/convolutional-neural-networks/programming/4AZ8P/a
 It uses a pre-trained VGG19 model and loss function that is a weighted average of
 * Content loss: mean squared error between the content and output images
 * Style loss: mean squared error of the gram matrices of the style and output images
+An overview of the technique is also here: https://www.tensorflow.org/tutorials/generative/style_transfer
 """
 
 # pylint: disable=invalid-name, line-too-long, too-many-locals, too-many-arguments
