@@ -98,7 +98,6 @@ class DisplayImage (tk.Label):
         self.config (image = img)
         self.image = img
 
-# Create a class to display a label and small numeric input field
 class NumberEntry (tk.Frame):
     """A frame containing a label and a numeric entry field"""
     def __init__ (self, win : tk.Tk, label : str, value : int, min_value : int, max_value : int):
@@ -134,7 +133,7 @@ class Root (tk.Tk):
         settings = load_settings ()
         self.settings = settings
 
-        # Create a frame to hold all the widgets
+        # A frame to hold all the widgets
         frame = tk.Frame (self, relief=tk.RAISED, borderwidth=1)
 
         # A read-only message box to display program information
