@@ -65,16 +65,15 @@ def compute_layer_style_cost(a_S, a_G):
     The normalized squared error between the style and generated images "gram" matrices; these matrices
     measure the correlation between the different channels of the images
     """
-    ### START CODE HERE
 
     # Get the dimensions of a_G
     _, n_H, n_W, n_C = a_G.get_shape().as_list()
 
-    # Reshape the tensors from (1, n_H, n_W, n_C) to (n_C, n_H * n_W) (≈2 lines)
+    # Reshape the tensors from (1, n_H, n_W, n_C) to (n_C, n_H * n_W)
     a_S = tf.reshape(tf.transpose(a_S, perm=[0, 3, 1, 2]), [n_C, n_H*n_W])
     a_G = tf.reshape(tf.transpose(a_G, perm=[0, 3, 1, 2]), [n_C, n_H*n_W])
 
-    # Computing gram_matrices for both images S and G (≈2 lines)
+    # Computing gram_matrices for both images S and G
     GS = tf.matmul(a_S, tf.transpose(a_S))
     GG = tf.matmul(a_G, tf.transpose(a_G))
 
@@ -134,7 +133,7 @@ def initialize_generated_image(content_image):
     generated_image = tf.Variable(tf.image.convert_image_dtype(content_image, tf.float32))
     noise = tf.random.uniform(tf.shape(generated_image), -0.25, 0.25)
     generated_image = tf.add(generated_image, noise)
-    generated_image = tf.clip_by_value(generated_image, clip_value_min=0.0, clip_value_max=1.0)
+    generated_image = clip_0_1(generated_image)
     return generated_image
 
 def clip_0_1(img):
